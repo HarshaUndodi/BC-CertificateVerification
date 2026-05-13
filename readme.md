@@ -1,61 +1,63 @@
+# 🛡️ CertiSafe: Blockchain Certificate Verification System
 
-# Student Management Portal using Blockchain
+CertiSafe is a professional decentralized application (dApp) designed to issue and verify tamper-proof academic credentials. By combining the **Ethereum Blockchain (Sepolia)** with **IPFS (InterPlanetary File System)**, CertiSafe ensures that certificates are secure, permanent, and easily verifiable via QR codes.
 
-This project contains the implementation of a Student Management Portal which is deployed on Sepolia Testnet using HardHat and the FrontEnd is provided by React.js
+## 🌟 Key Features
 
+-   **Decentralized Storage**: Certificate metadata is stored on IPFS, ensuring data longevity and reducing on-chain gas costs.
+-   **Immutable Records**: All issuance events are recorded on the Ethereum Sepolia Testnet.
+-   **Regal UI/UX**: A premium dashboard featuring glass-morphism, custom typography, and official academic styling.
+-   **Scan-to-Verify**: Integrated QR codes that lead to a mobile-responsive public verification page.
+-   **PDF Export**: High-resolution "Official Diploma" generation for students to download and print.
+-   **Security First**: Environment variable management to protect sensitive API keys.
 
+## 🛠️ Technology Stack
 
+-   **Smart Contracts**: Solidity, Hardhat
+-   **Frontend**: React.js, Vite, React Router
+-   **Blockchain Interaction**: Ethers.js (v6)
+-   **Storage**: IPFS (via Pinata API)
+-   **Deployment**: Sepolia Testnet
 
+## 🚀 Getting Started
 
-## Deployment(to be put in terminal)
-
-To install the packages
-
+### 1. Smart Contract (Hardhat)
 ```bash
-  npm install
+# Install dependencies
+npm install
+
+# Compile the contract
+npx hardhat compile
+
+# Deploy to Sepolia
+npx hardhat ignition deploy ./ignition/modules/CertificateModule.js --network sepolia
 ```
 
-To install the hardhat-tool-box:
-
+### 2. Frontend (React)
 ```bash
-  npm install --save-dev @nomicfoundation/hardhat-toolbox
+cd Frontend
+
+# Install dependencies
+npm install
+
+# Configure Environment Variables
+# Create a .env file and add:
+# VITE_PINATA_JWT=your_jwt_here
+# VITE_CONTRACT_ADDRESS=your_deployed_address_here
+
+# Run locally
+npm run dev
 ```
 
-To compile the solidity file:
+## 📜 How to Verify
+Candidates can share their **Certificate ID** or the **QR Code**. 
+- Scanning the QR code leads to: `https://[your-domain]/verify/[ID]`
+- The system automatically cross-references the Blockchain and IPFS to confirm authenticity.
 
-```bash
-  npx hardhat compile
-```
-To compile the test file:
+---
 
-```bash
-  npx hardhat test
-```
-To set the configuration variables(infura api key for sepolia and private metamask wallet address):
+### 🛡️ Security Note
+The `.env` file and `vars.json` are excluded from this repository to protect private keys. Always use your own API keys for production deployments.
 
-```bash
-  npx hardhat vars set INFURA_API_KEY
-```
-```bash
-  npx hardhat vars set SEPOLIA_PRIVATE_KEY
-```
-To Depoly the contract:
-
-```bash
-  npx hardhat ignition deploy ./ignition/modules/StudentRecords.js --network sepolia
-```
-To shift to frontend directory:
-
-```bash
- cd frontend
-```
-To install the packges for frontend:
-
-```bash
- npm install
-```
-To deploy the website:
-
-```bash
-  npm run dev
-```
+---
+Created with ❤️ for the Blockchain Lab Presentation.

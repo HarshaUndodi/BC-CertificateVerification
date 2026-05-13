@@ -6,7 +6,7 @@ import abi from './CertificateManager.json';
 function SetDetails() {
     const [name, setName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
-    const contractAddress ="0x2A8c4587403e2a0c48D455DDeC0BE5a195C65885";
+    const contractAddress ="0xd9Cd2980969dCA1db4804c4cCC4033c9F7D38680";
     const ContractABI = abi.abi;
 
     const handleSubmit = async (event) => {
