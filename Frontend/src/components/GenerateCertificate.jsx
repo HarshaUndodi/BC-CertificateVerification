@@ -49,7 +49,7 @@ function GenerateCertificate() {
 
       // 3. Store the IPFS Hash on Blockchain
       alert("Step 2/2: Storing CID on Blockchain...");
-      const { signer } = await getBlockchain();
+      const { signer } = await getBlockchain(true);
       const contract = new ethers.Contract(contractAddress, ContractABI, signer);
       
       // We store the ipfsHash in the 'data' field of our contract

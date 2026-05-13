@@ -58,7 +58,10 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
     }
     setLoading(true);
     try {
-      const { signer } = await getBlockchain();
+      if (!contractAddress) {
+        throw new Error("VITE_CONTRACT_ADDRESS is not set in Render environment variables!");
+      }
+      const { signer } = await getBlockchain(false); // Public read-only
       const contract = new ethers.Contract(contractAddress, ContractABI, signer);
       const result = await contract.verifyCertificate(targetId);
       
