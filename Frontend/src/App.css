@@ -404,12 +404,107 @@ button:hover {
 }
 
 .public-verify-page {
-  background: var(--bg-dark);
+  background: linear-gradient(135deg, #050b18 0%, #0a1930 100%);
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 20px;
+}
+
+.public-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 40px 30px;
+  max-width: 450px;
+  width: 100%;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.public-logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 30px;
+  letter-spacing: 2px;
+}
+
+.public-loading {
+  padding: 40px 0;
+}
+
+.public-loading p {
+  color: #94a3b8;
+  margin-top: 15px;
+}
+
+.verified-badge {
+  margin-bottom: 30px;
+}
+
+.check-icon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.verified-badge h2 {
+  color: #10b981;
+  font-size: 1.6rem;
+  margin: 10px 0 5px 0;
+}
+
+.verified-sub {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.failed-badge h2 {
+  color: #ef4444;
+  font-size: 1.6rem;
+  margin: 10px 0 5px 0;
+}
+
+.detail-list {
+  text-align: left;
+  margin: 25px 0;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.detail-label {
+  color: #64748b;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  color: #e2e8f0;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: right;
+  max-width: 60%;
+  word-break: break-word;
+}
+
+.blockchain-badge {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 50px;
+  color: #10b981;
+  font-size: 0.85rem;
+  display: inline-block;
 }
 
 @media (max-width: 768px) {

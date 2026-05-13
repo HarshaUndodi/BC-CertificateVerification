@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import GenerateCertificate from './components/GenerateCertificate';
 import VerifyCertificate from './components/VerifyCertificate';
+import PublicVerify from './components/PublicVerify';
 import "./App.css";
 
 // Main Dashboard Component
@@ -59,27 +60,16 @@ function Dashboard() {
   );
 }
 
-// Dedicated Public Verification View for QR Scanning
-function PublicView() {
-  const { id } = useParams();
-  return (
-    <div className="public-verify-page">
-      <div className="container">
-         <VerifyCertificate defaultId={id} autoVerify={true} />
-      </div>
-    </div>
-  );
-}
-
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/verify/:id" element={<PublicView />} />
+        <Route path="/verify/:id" element={<PublicVerify />} />
       </Routes>
     </Router>
   );
 }
 
 export default App;
+
