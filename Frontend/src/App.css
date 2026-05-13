@@ -125,8 +125,12 @@ body {
 .status-dot {
   width: 10px;
   height: 10px;
-  background: #22c55e;
+  background: #64748b; /* Neutral Grey */
   border-radius: 50%;
+}
+
+.status-dot.admin-active {
+  background: #22c55e; /* Glowing Green */
   box-shadow: 0 0 10px #22c55e;
 }
 

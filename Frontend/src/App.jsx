@@ -7,6 +7,20 @@ import "./App.css";
 // Main Dashboard Component
 function Dashboard() {
   const [activeTab, setActiveTab] = useState('verify');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const adminAddress = "0x5bD0005b3ee7e7a64425d1838396DD5de9122078";
+
+  React.useEffect(() => {
+    const checkAdmin = async () => {
+      if (window.ethereum) {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0 && accounts[0].toLowerCase() === adminAddress.toLowerCase()) {
+          setIsAdmin(true);
+        }
+      }
+    };
+    checkAdmin();
+  }, []);
 
   return (
     <div className="dashboard">
@@ -32,7 +46,8 @@ function Dashboard() {
         <header className="top-bar">
           <h1>{activeTab === 'verify' ? 'Public Verification Portal' : 'Administrator Dashboard'}</h1>
           <div className="user-profile">
-            <span className="status-dot"></span> Admin Account
+            <span className={`status-dot ${isAdmin ? 'admin-active' : ''}`}></span> 
+            {isAdmin ? 'Admin Authorized' : 'Guest Mode'}
           </div>
         </header>
 

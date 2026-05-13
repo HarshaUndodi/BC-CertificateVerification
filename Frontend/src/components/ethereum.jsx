@@ -14,8 +14,9 @@ export async function getBlockchain(needSigner = false) {
 
   // PUBLIC READ-ONLY PROVIDER (For Verification)
   // No MetaMask needed for users scanning the QR code!
-  const publicProvider = new ethers.JsonRpcProvider("https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12ede4456168");
-  return { signer: publicProvider }; // In read-only mode, we use provider as the 'caller'
+  const infuraId = import.meta.env.VITE_INFURA_ID;
+  const publicProvider = new ethers.JsonRpcProvider(`https://sepolia.infura.io/v3/${infuraId}`);
+  return { signer: publicProvider }; 
 }
 
 export default getBlockchain;
