@@ -151,6 +151,76 @@ body {
   margin: 0 auto;
 }
 
+/* VERIFY TABS */
+.verify-tabs {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 25px;
+}
+
+.tab-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  padding: 12px 24px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  width: auto;
+  transition: all 0.3s;
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  transform: none;
+  box-shadow: none;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+  color: white;
+  border-color: transparent;
+}
+
+/* PDF UPLOAD */
+.pdf-upload-box {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding: 40px;
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.upload-label:hover {
+  border-color: var(--accent);
+  background: rgba(0, 188, 212, 0.05);
+}
+
+.upload-icon {
+  font-size: 3rem;
+}
+
+.pdf-status {
+  margin-top: 15px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.95rem;
+}
+
 input {
   background: #0f172a;
   border: 1px solid #334155;

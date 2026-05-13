@@ -6,6 +6,10 @@ import abi from './CertificateManager.json';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   const certRef = useRef();
@@ -13,6 +17,8 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   const [verificationResult, setVerificationResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [verifyMode, setVerifyMode] = useState('id'); // 'id' or 'pdf'
+  const [pdfStatus, setPdfStatus] = useState('');
   
   const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
   const ContractABI = abi.abi;
@@ -23,7 +29,7 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
     try {
       const element = certRef.current;
       const canvas = await html2canvas(element, {
-        scale: 2, // High resolution
+        scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff"
@@ -44,26 +50,65 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
     }
   };
 
+  // Extract Certificate ID from uploaded PDF
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || file.type !== 'application/pdf') {
+      alert("Please upload a valid PDF file.");
+      return;
+    }
+
+    setPdfStatus('📖 Reading PDF...');
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + ' ';
+      }
+
+      console.log("Extracted PDF text:", fullText);
+
+      // Look for CERT-XXXXXXX pattern
+      const match = fullText.match(/CERT-[A-Z0-9]+/i);
+      if (match) {
+        const extractedId = match[0];
+        setPdfStatus(`✅ Found ID: ${extractedId} — Verifying...`);
+        setId(extractedId);
+        // Auto-trigger verification
+        setTimeout(() => {
+          handleVerifyWithId(extractedId);
+        }, 500);
+      } else {
+        setPdfStatus('❌ No Certificate ID (CERT-XXX) found in this PDF.');
+      }
+    } catch (error) {
+      console.error("PDF Parse Error:", error);
+      setPdfStatus('❌ Failed to read PDF. Try a different file.');
+    }
+  };
+
   useEffect(() => {
     if (autoVerify && defaultId) {
       handleVerify();
     }
   }, [defaultId]);
 
-  const handleVerify = async () => {
-    const targetId = id || defaultId;
-    if (!targetId) {
-      alert("Please enter a Certificate ID");
-      return;
-    }
+  const handleVerifyWithId = async (certId) => {
+    if (!certId) return;
     setLoading(true);
+    setVerificationResult(null);
     try {
       if (!contractAddress) {
-        throw new Error("VITE_CONTRACT_ADDRESS is not set in Render environment variables!");
+        throw new Error("VITE_CONTRACT_ADDRESS is not set!");
       }
-      const { signer } = await getBlockchain(false); // Public read-only
+      const { signer } = await getBlockchain(false);
       const contract = new ethers.Contract(contractAddress, ContractABI, signer);
-      const result = await contract.verifyCertificate(targetId);
+      const result = await contract.verifyCertificate(certId);
       
       let finalData = result.data;
       
@@ -81,11 +126,14 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
         isValid: result.isValid,
         issuer: result.issuer,
         data: finalData,
-        id: targetId
+        id: certId
       });
 
       if (!result.isValid) {
+        setPdfStatus('❌ Certificate NOT Found on Blockchain!');
         alert("Certificate NOT Found or Invalid! ❌");
+      } else {
+        setPdfStatus('✅ Certificate Verified Successfully!');
       }
     } catch (error) {
       console.error(error);
@@ -95,20 +143,57 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
     }
   };
 
-  // Construct a shareable URL for the QR code
-  // Note: For phone scanning, 'localhost' must be replaced by your computer's IP address
+  const handleVerify = async () => {
+    const targetId = id || defaultId;
+    if (!targetId) {
+      alert("Please enter a Certificate ID");
+      return;
+    }
+    await handleVerifyWithId(targetId);
+  };
+
   const shareableURL = `${window.location.origin}/verify/${id || defaultId}`;
 
   return (
     <div className="section">
       {!autoVerify && <h2>Verify Certificate</h2>}
       {!autoVerify && (
-        <div className="search-box">
-          <input type="text" value={id} onChange={e => setId(e.target.value)} placeholder="Enter Certificate ID (e.g. CERT-101)" />
-          <button onClick={handleVerify} disabled={loading}>
-            {loading ? <div className="loading-spinner"></div> : "Verify"}
-          </button>
-        </div>
+        <>
+          <div className="verify-tabs">
+            <button 
+              className={`tab-btn ${verifyMode === 'id' ? 'active' : ''}`}
+              onClick={() => setVerifyMode('id')}
+            >
+              🔑 Enter ID
+            </button>
+            <button 
+              className={`tab-btn ${verifyMode === 'pdf' ? 'active' : ''}`}
+              onClick={() => setVerifyMode('pdf')}
+            >
+              📄 Upload PDF
+            </button>
+          </div>
+
+          {verifyMode === 'id' && (
+            <div className="search-box">
+              <input type="text" value={id} onChange={e => setId(e.target.value)} placeholder="Enter Certificate ID (e.g. CERT-101)" />
+              <button onClick={handleVerify} disabled={loading}>
+                {loading ? <div className="loading-spinner"></div> : "Verify"}
+              </button>
+            </div>
+          )}
+
+          {verifyMode === 'pdf' && (
+            <div className="pdf-upload-box">
+              <label className="upload-label">
+                <span className="upload-icon">📁</span>
+                <span>Choose Certificate PDF</span>
+                <input type="file" accept=".pdf" onChange={handlePdfUpload} hidden />
+              </label>
+              {pdfStatus && <p className="pdf-status">{pdfStatus}</p>}
+            </div>
+          )}
+        </>
       )}
 
       {loading && autoVerify && <div className="loading-spinner"></div>}
