@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Pinyon+Script&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
 :root {
   --sidebar-width: 280px;
   --primary-glow: #00d2ff;
@@ -250,7 +252,6 @@ button:hover {
   box-shadow: 0 10px 20px rgba(0, 210, 255, 0.3);
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Pinyon+Script&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
 
 .certificate-container {
   margin-top: 20px;
