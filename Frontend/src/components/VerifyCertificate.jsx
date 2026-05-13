@@ -41,6 +41,13 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
         format: [canvas.width, canvas.height]
       });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      
+      // Embed Certificate ID as real text (tiny, bottom-right corner)
+      // This allows the PDF upload parser to extract the ID
+      pdf.setFontSize(8);
+      pdf.setTextColor(200, 200, 200);
+      pdf.text(`Certificate ID: ${verificationResult.id}`, canvas.width - 20, canvas.height - 10, { align: 'right' });
+      
       pdf.save(`Certificate-${verificationResult.id}.pdf`);
     } catch (error) {
       console.error("PDF Export Error:", error);
@@ -73,18 +80,24 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
 
       console.log("Extracted PDF text:", fullText);
 
-      // Look for CERT-XXXXXXX pattern
-      const match = fullText.match(/CERT-[A-Z0-9]+/i);
+      // Method 1: Look for CERT-XXXXXXX pattern in PDF text content
+      let match = fullText.match(/CERT-[A-Z0-9]+/i);
+      
+      // Method 2: Fallback - extract from filename (e.g. "Certificate-CERT-XT1FPEN0.pdf")
+      if (!match) {
+        const fileMatch = file.name.match(/CERT-[A-Z0-9]+/i);
+        if (fileMatch) match = fileMatch;
+      }
+
       if (match) {
         const extractedId = match[0];
-        setPdfStatus(`✅ Found ID: ${extractedId} — Verifying...`);
+        setPdfStatus(`✅ Found ID: ${extractedId} — Verifying on Blockchain...`);
         setId(extractedId);
-        // Auto-trigger verification
         setTimeout(() => {
           handleVerifyWithId(extractedId);
         }, 500);
       } else {
-        setPdfStatus('❌ No Certificate ID (CERT-XXX) found in this PDF.');
+        setPdfStatus('❌ No Certificate ID found. Please ensure this is a CertiSafe PDF.');
       }
     } catch (error) {
       console.error("PDF Parse Error:", error);
