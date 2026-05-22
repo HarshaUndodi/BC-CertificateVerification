@@ -4,25 +4,24 @@ import { useParams } from 'react-router-dom';
 import getBlockchain from './ethereum';
 import abi from './CertificateManager.json';
 import axios from 'axios';
+import CertificateRenderer from './CertificateTemplates';
 
 function PublicVerify() {
-  const { id } = useParams();
-  const [status, setStatus] = useState('loading'); // 'loading', 'verified', 'failed'
+  const { id }  = useParams();
+  const [status,  setStatus]  = useState('loading');
   const [details, setDetails] = useState(null);
-  const [error, setError] = useState('');
+  const [error,   setError]   = useState('');
 
   const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
-  const ContractABI = abi.abi;
+  const ContractABI     = abi.abi;
 
-  useEffect(() => {
-    if (id) verifyOnChain();
-  }, [id]);
+  useEffect(() => { if (id) verifyOnChain(); }, [id]);
 
   const verifyOnChain = async () => {
     try {
       const { signer } = await getBlockchain(false);
-      const contract = new ethers.Contract(contractAddress, ContractABI, signer);
-      const result = await contract.verifyCertificate(id);
+      const contract   = new ethers.Contract(contractAddress, ContractABI, signer);
+      const result     = await contract.verifyCertificate(id);
 
       if (!result.isValid) {
         setStatus('failed');
@@ -30,37 +29,22 @@ function PublicVerify() {
         return;
       }
 
-      let certDetails = {
-        id: id,
-        issuer: result.issuer,
-        course: result.data,
-        grade: 'N/A',
-        date: 'N/A',
-      };
+      let certDetails = { id, issuer: result.issuer, course: result.data };
 
-      // If data is an IPFS hash, fetch full details
       if (result.data.startsWith('Qm')) {
         try {
-          const response = await axios.get(`https://gateway.pinata.cloud/ipfs/${result.data}`);
-          const ipfs = response.data;
-          certDetails = {
-            id: id,
-            issuer: ipfs.issuer || result.issuer,
-            recipient: ipfs.recipient || 'N/A',
-            course: ipfs.course || 'N/A',
-            grade: ipfs.grade || 'N/A',
-            date: ipfs.date || 'N/A',
-            type: ipfs.type || 'Academic Certificate',
-          };
+          const response = await axios.get(
+            `https://gateway.pinata.cloud/ipfs/${result.data}`
+          );
+          certDetails = { id, issuer: result.issuer, ...response.data };
         } catch (e) {
-          console.warn("IPFS fetch failed, using on-chain data", e);
+          console.warn('IPFS fetch failed, using on-chain data', e);
         }
       } else if (result.data.includes('|')) {
-        // Parse combined string format: "Course: X | Grade: Y | Date: Z"
         const parts = result.data.split('|');
         certDetails.course = parts[0]?.split(':')[1]?.trim() || result.data;
-        certDetails.grade = parts[1]?.split(':')[1]?.trim() || 'N/A';
-        certDetails.date = parts[2]?.split(':')[1]?.trim() || 'N/A';
+        certDetails.grade  = parts[1]?.split(':')[1]?.trim() || 'N/A';
+        certDetails.date   = parts[2]?.split(':')[1]?.trim() || 'N/A';
       }
 
       setDetails(certDetails);
@@ -72,68 +56,29 @@ function PublicVerify() {
     }
   };
 
-  return (
-    <div className="public-verify-page">
-      <div className="public-card">
-        <div className="public-logo">🛡️ CertiSafe</div>
+  const qrUrl = `${window.location.origin}/verify/${id}`;
 
-        {status === 'loading' && (
+  /* ─── Loading ─── */
+  if (status === 'loading') {
+    return (
+      <div className="public-verify-page">
+        <div className="public-card">
+          <div className="public-logo">🛡️ CertiSafe</div>
           <div className="public-loading">
-            <div className="loading-spinner"></div>
+            <div className="loading-spinner" />
             <p>Verifying on Blockchain...</p>
           </div>
-        )}
+        </div>
+      </div>
+    );
+  }
 
-        {status === 'verified' && details && (
-          <div className="public-result">
-            <div className="verified-badge">
-              <span className="check-icon">✅</span>
-              <h2>Verified Successfully</h2>
-              <p className="verified-sub">This credential is authentic and recorded on the Ethereum Blockchain.</p>
-            </div>
-
-            <div className="detail-list">
-              <div className="detail-row">
-                <span className="detail-label">Certificate ID</span>
-                <span className="detail-value">{details.id}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Institution</span>
-                <span className="detail-value">{details.issuer}</span>
-              </div>
-              {details.recipient && details.recipient !== 'N/A' && (
-                <div className="detail-row">
-                  <span className="detail-label">Recipient</span>
-                  <span className="detail-value">{details.recipient}</span>
-                </div>
-              )}
-              <div className="detail-row">
-                <span className="detail-label">Course</span>
-                <span className="detail-value">{details.course}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Grade</span>
-                <span className="detail-value">{details.grade}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Date</span>
-                <span className="detail-value">{details.date}</span>
-              </div>
-              {details.type && (
-                <div className="detail-row">
-                  <span className="detail-label">Type</span>
-                  <span className="detail-value">{details.type}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="blockchain-badge">
-              🔗 Verified on Sepolia Testnet
-            </div>
-          </div>
-        )}
-
-        {status === 'failed' && (
+  /* ─── Failed ─── */
+  if (status === 'failed') {
+    return (
+      <div className="public-verify-page">
+        <div className="public-card">
+          <div className="public-logo">🛡️ CertiSafe</div>
           <div className="public-result">
             <div className="failed-badge">
               <span className="check-icon">❌</span>
@@ -141,7 +86,23 @@ function PublicVerify() {
               <p className="verified-sub">{error}</p>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── Verified — show full certificate template ─── */
+  return (
+    <div className="public-verify-page public-verified-page">
+      {/* Small status banner */}
+      <div className="public-verified-banner">
+        <span>✅ <strong>Blockchain Verified</strong> — This credential is authentic.</span>
+        <span className="public-banner-chain">🔗 Sepolia Testnet</span>
+      </div>
+
+      {/* Full certificate */}
+      <div className="public-cert-wrapper">
+        <CertificateRenderer data={details} qrUrl={qrUrl} />
       </div>
     </div>
   );
