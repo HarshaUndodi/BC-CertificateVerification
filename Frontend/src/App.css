@@ -743,7 +743,6 @@ button:disabled {
 .tmpl {
   font-family: 'Inter', sans-serif;
   overflow: hidden;
-  animation: fadeIn 0.5s ease;
 }
 .photo-placeholder-icon {
   display: flex;
