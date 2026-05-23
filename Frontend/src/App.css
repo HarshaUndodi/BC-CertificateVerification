@@ -1522,3 +1522,100 @@ button:disabled {
     padding: 12px 30px;
   }
 }
+
+/* ════════════════════════════════════════════════════════════
+   FRAUD ALERT — PDF Photo Tamper Detection
+════════════════════════════════════════════════════════════ */
+.fraud-alert-banner {
+  background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
+  border: 2px solid #dc2626;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin: 20px 0;
+  animation: pulseAlert 2s ease-in-out infinite;
+}
+@keyframes pulseAlert {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.3); }
+  50% { box-shadow: 0 0 20px 4px rgba(220, 38, 38, 0.15); }
+}
+.fraud-alert-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.fraud-alert-icon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+}
+.fraud-alert-header strong {
+  display: block;
+  font-size: 1.1rem;
+  color: #dc2626;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.fraud-alert-header p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #991b1b;
+  line-height: 1.5;
+}
+.fraud-photo-comparison {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.fraud-photo-card {
+  flex: 1;
+  min-width: 200px;
+  max-width: 280px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  text-align: center;
+}
+.fraud-photo-card.fake {
+  border: 3px solid #dc2626;
+  background: #fef2f2;
+}
+.fraud-photo-card.real {
+  border: 3px solid #16a34a;
+  background: #f0fdf4;
+}
+.fraud-photo-label {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.fraud-photo-card.fake .fraud-photo-label {
+  background: #dc2626;
+  color: #fff;
+}
+.fraud-photo-card.real .fraud-photo-label {
+  background: #16a34a;
+  color: #fff;
+}
+.fraud-photo-card img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  padding: 8px;
+}
+.fraud-photo-vs {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .fraud-photo-comparison {
+    flex-direction: column;
+  }
+  .fraud-photo-card {
+    max-width: 100%;
+  }
+}

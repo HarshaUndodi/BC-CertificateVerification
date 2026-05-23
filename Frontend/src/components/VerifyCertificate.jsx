@@ -21,14 +21,16 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   const [downloading,        setDownloading]        = useState(false);
   const [verifyMode,         setVerifyMode]         = useState('id');
   const [pdfStatus,          setPdfStatus]          = useState('');
-  const [extractedPdfImages, setExtractedPdfImages] = useState([]);
 
   // ── Anti-Fraud State ──
-  const [photoCheck,     setPhotoCheck]     = useState(null); // { authentic, distance, reason }
-  const [signatureCheck, setSignatureCheck] = useState(null); // { valid, signerAddress, reason }
-  const [revocationInfo, setRevocationInfo] = useState(null); // { revoked, revokedAt }
-  const [auditLog,       setAuditLog]       = useState([]);
+  const [photoCheck,     setPhotoCheck]     = useState(null);
+  const [signatureCheck, setSignatureCheck] = useState(null);
+  const [revocationInfo, setRevocationInfo] = useState(null);
   const [institutionName, setInstitutionName] = useState('');
+
+  // ── PDF Tamper Detection State ──
+  const [pdfTamperDetected, setPdfTamperDetected] = useState(false);
+  const [pdfExtractedPhoto, setPdfExtractedPhoto] = useState('');
 
   const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
   const ContractABI     = abi.abi;
@@ -51,7 +53,6 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
         format:      [canvas.width, canvas.height],
       });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      // Embed hidden cert ID so PDF-upload verification can extract it
       pdf.setFontSize(8);
       pdf.setTextColor(200, 200, 200);
       pdf.text(
@@ -77,30 +78,37 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       return;
     }
     setPdfStatus('📖 Reading PDF...');
+    setPdfTamperDetected(false);
+    setPdfExtractedPhoto('');
     try {
-      const arrayBuffer  = await file.arrayBuffer();
-      const pdf          = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
-      setPdfStatus('📖 Extracting embedded images...');
-      const images = await extractImagesFromPdf(pdf);
-      setExtractedPdfImages(images);
+      // Extract images from the PDF
+      setPdfStatus('🔍 Extracting photos from PDF...');
+      const pdfImages = await extractImagesFromPdf(pdf);
+      console.log(`Extracted ${pdfImages.length} image(s) from PDF`);
       
-      let fullText       = '';
+      // Extract text to find certificate ID
+      let fullText = '';
       for (let i = 1; i <= pdf.numPages; i++) {
-        const page        = await pdf.getPage(i);
+        const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         fullText += textContent.items.map(item => item.str).join(' ') + ' ';
       }
+      
       let match = fullText.match(/(?:CERT|GRD|CRS|SKL|ACH|INT)-[A-Z0-9]+/i);
       if (!match) {
         const fileMatch = file.name.match(/(?:CERT|GRD|CRS|SKL|ACH|INT)-[A-Z0-9]+/i);
         if (fileMatch) match = fileMatch;
       }
+      
       if (match) {
         const extractedId = match[0];
         setPdfStatus(`✅ Found ID: ${extractedId} — Verifying on Blockchain...`);
         setId(extractedId);
-        setTimeout(() => handleVerifyWithId(extractedId), 500);
+        // Pass images directly to avoid stale closure issue
+        handleVerifyWithId(extractedId, pdfImages);
       } else {
         setPdfStatus('❌ No Certificate ID found. Ensure this is a CertiSafe PDF.');
       }
@@ -115,7 +123,8 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   }, [defaultId]);
 
   // ── Core Verify ──────────────────────────────────────────────
-  const handleVerifyWithId = async (certId) => {
+  // pdfImages parameter: array of base64 images extracted from an uploaded PDF
+  const handleVerifyWithId = async (certId, pdfImages = []) => {
     if (!certId) return;
     setLoading(true);
     setVerificationResult(null);
@@ -123,6 +132,9 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
     setSignatureCheck(null);
     setRevocationInfo(null);
     setInstitutionName('');
+    setPdfTamperDetected(false);
+    setPdfExtractedPhoto('');
+    
     try {
       if (!contractAddress) throw new Error('VITE_CONTRACT_ADDRESS is not set!');
 
@@ -174,21 +186,28 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       setVerificationResult(certData);
 
       // ══════════════════════════════════════
-      // ANTI-FRAUD CHECKS (async, non-blocking)
+      // ANTI-FRAUD CHECKS
       // ══════════════════════════════════════
 
       // ── 1. Photo Hash Verification ──
       const onChainPhotoHash = result.photoHash;
+      const isPdfMode = pdfImages.length > 0;
+      
       if (onChainPhotoHash && onChainPhotoHash !== '0x' + '0'.repeat(64)) {
-        if (verifyMode === 'pdf' && extractedPdfImages.length > 0) {
-          // Verify against images extracted from the uploaded PDF
+        if (isPdfMode) {
+          // ═══ PDF MODE: Compare photos extracted from the uploaded PDF ═══
           let authentic = false;
           let bestDistance = 64;
-          for (const imgSrc of extractedPdfImages) {
+          let bestImage = '';
+          
+          for (const imgSrc of pdfImages) {
             try {
               const computedHash = await computePhotoHash(imgSrc);
               const photoResult = isPhotoAuthentic(onChainPhotoHash, computedHash);
-              if (photoResult.distance < bestDistance) bestDistance = photoResult.distance;
+              if (photoResult.distance < bestDistance) {
+                bestDistance = photoResult.distance;
+                bestImage = imgSrc;
+              }
               if (photoResult.authentic) {
                 authentic = true;
                 break;
@@ -197,13 +216,17 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
               console.warn('Hash error for extracted image', e);
             }
           }
+          
           if (authentic) {
-            setPhotoCheck({ authentic: true, reason: `PDF Photo verified (distance: ${bestDistance})` });
+            setPhotoCheck({ authentic: true, distance: bestDistance, reason: `PDF photo matches blockchain record (distance: ${bestDistance})` });
           } else {
-            setPhotoCheck({ authentic: false, reason: `PHOTO TAMPERED: Uploaded PDF photo does not match blockchain record` });
+            // ⚠️ TAMPER DETECTED!
+            setPhotoCheck({ authentic: false, distance: bestDistance, reason: `🚨 FRAUD ALERT: The photo in the uploaded PDF has been REPLACED. It does not match the original photo stored on the blockchain.` });
+            setPdfTamperDetected(true);
+            if (bestImage) setPdfExtractedPhoto(bestImage);
           }
         } else if (certData.photo) {
-          // Default IPFS verification
+          // ═══ ID MODE: Compare IPFS photo against on-chain hash ═══
           try {
             const computedHash = await computePhotoHash(certData.photo);
             const photoResult = isPhotoAuthentic(onChainPhotoHash, computedHash);
@@ -324,6 +347,32 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       {loading && autoVerify && <div className="loading-spinner" />}
 
       {/* ═══════════════════════════════════════════════
+          FRAUD ALERT — PDF Photo Tamper Detection
+      ═══════════════════════════════════════════════ */}
+      {pdfTamperDetected && verificationResult && verificationResult.isValid && (
+        <div className="fraud-alert-banner">
+          <div className="fraud-alert-header">
+            <span className="fraud-alert-icon">🚨</span>
+            <div>
+              <strong>FRAUD DETECTED — Photo Replaced in PDF</strong>
+              <p>The photo inside the uploaded PDF does <strong>NOT</strong> match the original photo stored on the blockchain. Someone has tampered with this certificate.</p>
+            </div>
+          </div>
+          <div className="fraud-photo-comparison">
+            <div className="fraud-photo-card fake">
+              <div className="fraud-photo-label">❌ FAKE — From Uploaded PDF</div>
+              {pdfExtractedPhoto && <img src={pdfExtractedPhoto} alt="Fake photo from PDF" />}
+            </div>
+            <div className="fraud-photo-vs">VS</div>
+            <div className="fraud-photo-card real">
+              <div className="fraud-photo-label">✅ REAL — From Blockchain</div>
+              {verificationResult.photo && <img src={verificationResult.photo} alt="Original photo from blockchain" />}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════
           SECURITY DASHBOARD — Anti-Fraud Results
       ═══════════════════════════════════════════════ */}
       {verificationResult && verificationResult.isValid && (
@@ -433,9 +482,12 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
             <button
               className="download-btn"
               onClick={downloadPDF}
-              disabled={downloading || revocationInfo?.revoked}
+              disabled={downloading || revocationInfo?.revoked || pdfTamperDetected}
             >
-              {downloading ? 'Generating PDF...' : revocationInfo?.revoked ? '🚫 Download Disabled (Revoked)' : '📥 Download Official PDF'}
+              {downloading ? 'Generating PDF...' : 
+               revocationInfo?.revoked ? '🚫 Download Disabled (Revoked)' : 
+               pdfTamperDetected ? '🚫 Download Disabled (Tampered PDF)' :
+               '📥 Download Official PDF'}
             </button>
 
             <div ref={certRef} style={{ position: 'relative' }}>
@@ -447,6 +499,12 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
               {revocationInfo?.revoked && (
                 <div className="revoked-watermark-overlay">
                   <span>REVOKED</span>
+                </div>
+              )}
+              {/* Tampered Watermark Overlay */}
+              {pdfTamperDetected && (
+                <div className="revoked-watermark-overlay">
+                  <span style={{ color: 'rgba(220, 38, 38, 0.25)', borderColor: 'rgba(220, 38, 38, 0.2)' }}>TAMPERED</span>
                 </div>
               )}
             </div>
