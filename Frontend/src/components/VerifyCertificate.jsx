@@ -8,6 +8,7 @@ import { jsPDF } from 'jspdf';
 import * as pdfjsLib from 'pdfjs-dist';
 import CertificateRenderer from './CertificateTemplates';
 import { computePhotoHash, isPhotoAuthentic } from '../utils/photoHash';
+import { extractImagesFromPdf } from '../utils/pdfImages';
 
 // Set PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -20,6 +21,7 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   const [downloading,        setDownloading]        = useState(false);
   const [verifyMode,         setVerifyMode]         = useState('id');
   const [pdfStatus,          setPdfStatus]          = useState('');
+  const [extractedPdfImages, setExtractedPdfImages] = useState([]);
 
   // ── Anti-Fraud State ──
   const [photoCheck,     setPhotoCheck]     = useState(null); // { authentic, distance, reason }
@@ -78,6 +80,11 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
     try {
       const arrayBuffer  = await file.arrayBuffer();
       const pdf          = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      setPdfStatus('📖 Extracting embedded images...');
+      const images = await extractImagesFromPdf(pdf);
+      setExtractedPdfImages(images);
+      
       let fullText       = '';
       for (let i = 1; i <= pdf.numPages; i++) {
         const page        = await pdf.getPage(i);
@@ -172,17 +179,42 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
 
       // ── 1. Photo Hash Verification ──
       const onChainPhotoHash = result.photoHash;
-      if (onChainPhotoHash && onChainPhotoHash !== '0x' + '0'.repeat(64) && certData.photo) {
-        try {
-          const computedHash = await computePhotoHash(certData.photo);
-          const photoResult = isPhotoAuthentic(onChainPhotoHash, computedHash);
-          setPhotoCheck(photoResult);
-        } catch (err) {
-          console.warn('Photo hash check failed:', err);
-          setPhotoCheck({ authentic: null, reason: 'Could not verify photo hash' });
+      if (onChainPhotoHash && onChainPhotoHash !== '0x' + '0'.repeat(64)) {
+        if (verifyMode === 'pdf' && extractedPdfImages.length > 0) {
+          // Verify against images extracted from the uploaded PDF
+          let authentic = false;
+          let bestDistance = 64;
+          for (const imgSrc of extractedPdfImages) {
+            try {
+              const computedHash = await computePhotoHash(imgSrc);
+              const photoResult = isPhotoAuthentic(onChainPhotoHash, computedHash);
+              if (photoResult.distance < bestDistance) bestDistance = photoResult.distance;
+              if (photoResult.authentic) {
+                authentic = true;
+                break;
+              }
+            } catch (e) {
+              console.warn('Hash error for extracted image', e);
+            }
+          }
+          if (authentic) {
+            setPhotoCheck({ authentic: true, reason: `PDF Photo verified (distance: ${bestDistance})` });
+          } else {
+            setPhotoCheck({ authentic: false, reason: `PHOTO TAMPERED: Uploaded PDF photo does not match blockchain record` });
+          }
+        } else if (certData.photo) {
+          // Default IPFS verification
+          try {
+            const computedHash = await computePhotoHash(certData.photo);
+            const photoResult = isPhotoAuthentic(onChainPhotoHash, computedHash);
+            setPhotoCheck(photoResult);
+          } catch (err) {
+            console.warn('Photo hash check failed:', err);
+            setPhotoCheck({ authentic: null, reason: 'Could not verify photo hash' });
+          }
+        } else {
+          setPhotoCheck({ authentic: null, reason: 'Photo hash stored but no photo in IPFS metadata' });
         }
-      } else if (onChainPhotoHash && onChainPhotoHash !== '0x' + '0'.repeat(64)) {
-        setPhotoCheck({ authentic: null, reason: 'Photo hash stored but no photo in IPFS metadata' });
       } else {
         setPhotoCheck({ authentic: null, reason: 'No photo hash recorded for this certificate' });
       }
