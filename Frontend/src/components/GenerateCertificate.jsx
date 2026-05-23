@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import getBlockchain from './ethereum';
 import abi from './CertificateManager.json';
 import { uploadToIPFS } from '../utils/ipfs';
+import { computePhotoHash } from '../utils/photoHash';
 
 const CERT_TYPES = [
   { value: 'graduation',    label: '🎓 Graduation Degree' },
@@ -62,6 +63,7 @@ function GenerateCertificate() {
   const [endDate,         setEndDate]         = useState('');   // internship
 
   const [isUploading, setIsUploading] = useState(false);
+  const [mintStatus,  setMintStatus]  = useState('');
 
   const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
   const ContractABI = abi.abi;
@@ -97,10 +99,15 @@ function GenerateCertificate() {
     }
 
     setIsUploading(true);
+    setMintStatus('');
     try {
       const skillsArr = skills
         ? skills.split(',').map(s => s.trim()).filter(Boolean)
         : [];
+
+      // ── Step 1: Compute Photo Hash ──
+      setMintStatus('🔐 Step 1/4: Computing photo hash...');
+      const photoHash = await computePhotoHash(photoBase64);
 
       const metadata = {
         id,
@@ -112,6 +119,7 @@ function GenerateCertificate() {
         grade:          grade          || 'N/A',
         date:           date           || new Date().toLocaleDateString(),
         photo:          photoBase64    || '',
+        photoHash,      // Store in IPFS too for reference
         // Graduation
         degree,
         graduationYear,
@@ -134,18 +142,43 @@ function GenerateCertificate() {
         timestamp: Date.now(),
       };
 
-      alert('Step 1/2: Uploading Certificate to IPFS...');
+      // ── Step 2: Upload to IPFS ──
+      setMintStatus('📦 Step 2/4: Uploading to IPFS...');
       const ipfsHash = await uploadToIPFS(metadata);
 
-      alert('Step 2/2: Storing on Blockchain...');
+      // ── Step 3: Sign metadata (Admin Digital Signature) ──
+      setMintStatus('✍️ Step 3/4: Signing certificate metadata...');
       const { signer } = await getBlockchain(true);
-      const contract   = new ethers.Contract(contractAddress, ContractABI, signer);
-      const tx         = await contract.generateCertificate(id, issuer, recipient, ipfsHash);
+
+      // Create a deterministic message to sign (certId + ipfsHash + photoHash)
+      const messageToSign = JSON.stringify({
+        id,
+        ipfsHash,
+        photoHash,
+        issuer,
+        recipient,
+        certType,
+      });
+      const adminSignature = await signer.signMessage(messageToSign);
+
+      // ── Step 4: Store on Blockchain ──
+      setMintStatus('⛓️ Step 4/4: Minting on blockchain...');
+      const contract = new ethers.Contract(contractAddress, ContractABI, signer);
+      const tx = await contract.generateCertificateSecure(
+        id,
+        issuer,
+        recipient,
+        ipfsHash,
+        photoHash,
+        adminSignature,
+      );
       await tx.wait();
 
-      alert(`✅ Certificate secured!\nID: ${id}\nCID: ${ipfsHash}`);
+      setMintStatus('');
+      alert(`✅ Certificate secured with anti-fraud protection!\n\nID: ${id}\nCID: ${ipfsHash}\nPhoto Hash: ${photoHash.substring(0, 18)}...\nSignature: ${adminSignature.substring(0, 18)}...`);
     } catch (error) {
       console.error(error);
+      setMintStatus('');
       alert('Failed: ' + (error.reason || error.message || 'Check console.'));
     } finally {
       setIsUploading(false);
@@ -157,7 +190,22 @@ function GenerateCertificate() {
       <div className="form-header">
         <h2>Issue New Credential</h2>
         <p>Fill all details to mint a tamper-proof certificate on the Ethereum blockchain.</p>
+        <div className="security-features-banner">
+          <span>🔐 Anti-Fraud Protection Active:</span>
+          <span className="security-tag">Photo Hash</span>
+          <span className="security-tag">Digital Signature</span>
+          <span className="security-tag">IPFS Storage</span>
+          <span className="security-tag">On-Chain Record</span>
+        </div>
       </div>
+
+      {/* ── Mint Status Bar ── */}
+      {mintStatus && (
+        <div className="mint-status-bar">
+          <div className="loading-spinner" style={{ width: 18, height: 18 }} />
+          <span>{mintStatus}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="admin-form">
 
@@ -197,7 +245,7 @@ function GenerateCertificate() {
 
         {/* ── Candidate Photo ── */}
         <div className="form-group">
-          <label className="form-label">Candidate Photo</label>
+          <label className="form-label">Candidate Photo <span className="security-hint">(pHash computed for tamper detection)</span></label>
           <div className="photo-upload-row">
             <label className="photo-upload-btn">
               📷 Choose Photo
@@ -207,7 +255,7 @@ function GenerateCertificate() {
               <img src={photoPreview} alt="Preview" className="photo-preview" />
             )}
             {!photoPreview && (
-              <span className="photo-hint">JPG / PNG — will be stored on IPFS</span>
+              <span className="photo-hint">JPG / PNG — will be hashed & stored on IPFS</span>
             )}
           </div>
         </div>
@@ -469,7 +517,7 @@ function GenerateCertificate() {
 
         <button type="submit" disabled={isUploading} style={{ marginTop: '16px' }}>
           {isUploading
-            ? <><div className="loading-spinner" style={{ width: 20, height: 20, display: 'inline-block', marginRight: 8 }} />Uploading...</>
+            ? <><div className="loading-spinner" style={{ width: 20, height: 20, display: 'inline-block', marginRight: 8 }} />Securing...</>
             : '🔒 Mint & Secure Credential'
           }
         </button>

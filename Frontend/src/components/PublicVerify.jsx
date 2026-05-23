@@ -5,12 +5,19 @@ import getBlockchain from './ethereum';
 import abi from './CertificateManager.json';
 import axios from 'axios';
 import CertificateRenderer from './CertificateTemplates';
+import { computePhotoHash, isPhotoAuthentic } from '../utils/photoHash';
 
 function PublicVerify() {
   const { id }  = useParams();
   const [status,  setStatus]  = useState('loading');
   const [details, setDetails] = useState(null);
   const [error,   setError]   = useState('');
+
+  // ── Anti-Fraud State ──
+  const [photoCheck,     setPhotoCheck]     = useState(null);
+  const [signatureCheck, setSignatureCheck] = useState(null);
+  const [revocationInfo, setRevocationInfo] = useState(null);
+  const [institutionName, setInstitutionName] = useState('');
 
   const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
   const ContractABI     = abi.abi;
@@ -29,7 +36,27 @@ function PublicVerify() {
         return;
       }
 
-      let certDetails = { id, issuer: result.issuer, course: result.data };
+      // ── Revocation ──
+      setRevocationInfo({
+        revoked: result.revoked,
+        revokedAt: result.revokedAt ? new Date(Number(result.revokedAt) * 1000) : null,
+      });
+
+      // ── Institution ──
+      if (result.issuedBy && result.issuedBy !== ethers.ZeroAddress) {
+        try {
+          const inst = await contract.institutions(result.issuedBy);
+          setInstitutionName(inst.name || '');
+        } catch { /* ignore */ }
+      }
+
+      let certDetails = {
+        id,
+        issuer: result.issuer,
+        course: result.data,
+        issuedBy: result.issuedBy,
+        issuedAt: result.issuedAt ? new Date(Number(result.issuedAt) * 1000).toLocaleString() : '',
+      };
 
       if (result.data.startsWith('Qm')) {
         try {
@@ -48,7 +75,44 @@ function PublicVerify() {
       }
 
       setDetails(certDetails);
-      setStatus('verified');
+
+      // ── Photo Hash Check ──
+      const onChainPhotoHash = result.photoHash;
+      if (onChainPhotoHash && onChainPhotoHash !== '0x' + '0'.repeat(64) && certDetails.photo) {
+        try {
+          const computedHash = await computePhotoHash(certDetails.photo);
+          setPhotoCheck(isPhotoAuthentic(onChainPhotoHash, computedHash));
+        } catch {
+          setPhotoCheck({ authentic: null, reason: 'Could not verify photo hash' });
+        }
+      }
+
+      // ── Signature Check ──
+      const adminSig = result.adminSignature;
+      if (adminSig && adminSig !== '0x') {
+        try {
+          const messageToVerify = JSON.stringify({
+            id,
+            ipfsHash: result.data,
+            photoHash: onChainPhotoHash,
+            issuer: result.issuer,
+            recipient: certDetails.recipient,
+            certType: certDetails.certType || certDetails.type,
+          });
+          const recoveredAddress = ethers.verifyMessage(messageToVerify, adminSig);
+          const isFromIssuer = recoveredAddress.toLowerCase() === result.issuedBy.toLowerCase();
+          setSignatureCheck({
+            valid: isFromIssuer,
+            reason: isFromIssuer
+              ? `Valid — signed by issuing institution`
+              : `INVALID — signature does not match issuer`,
+          });
+        } catch {
+          setSignatureCheck({ valid: false, reason: 'Signature verification error' });
+        }
+      }
+
+      setStatus(result.revoked ? 'revoked' : 'verified');
     } catch (err) {
       console.error(err);
       setStatus('failed');
@@ -91,18 +155,58 @@ function PublicVerify() {
     );
   }
 
-  /* ─── Verified — show full certificate template ─── */
+  /* ─── Verified / Revoked — show full certificate template ─── */
   return (
     <div className="public-verify-page public-verified-page">
-      {/* Small status banner */}
-      <div className="public-verified-banner">
-        <span>✅ <strong>Blockchain Verified</strong> — This credential is authentic.</span>
-        <span className="public-banner-chain">🔗 Sepolia Testnet</span>
+      {/* Status banner */}
+      {revocationInfo?.revoked ? (
+        <div className="public-verified-banner" style={{ background: '#fef2f2', borderColor: 'rgba(220,38,38,0.2)', color: '#dc2626' }}>
+          <span>🚫 <strong>CERTIFICATE REVOKED</strong> — This credential has been invalidated.</span>
+          <span className="public-banner-chain">Revoked: {revocationInfo.revokedAt?.toLocaleDateString()}</span>
+        </div>
+      ) : (
+        <div className="public-verified-banner">
+          <span>✅ <strong>Blockchain Verified</strong> — This credential is authentic.</span>
+          <span className="public-banner-chain">🔗 Sepolia Testnet</span>
+        </div>
+      )}
+
+      {/* ── Security Summary for Public ── */}
+      <div className="public-security-summary">
+        <div className={`public-security-item ${revocationInfo?.revoked ? 'danger' : 'success'}`}>
+          {revocationInfo?.revoked ? '🚫 Revoked' : '⛓️ On-Chain'}
+        </div>
+        {photoCheck && (
+          <div className={`public-security-item ${
+            photoCheck.authentic === true ? 'success' :
+            photoCheck.authentic === false ? 'danger' : 'neutral'
+          }`}>
+            {photoCheck.authentic === true ? '🟢 Photo OK' :
+             photoCheck.authentic === false ? '🔴 Photo Tampered' : '⚪ No Photo Hash'}
+          </div>
+        )}
+        {signatureCheck && (
+          <div className={`public-security-item ${
+            signatureCheck.valid === true ? 'success' :
+            signatureCheck.valid === false ? 'danger' : 'neutral'
+          }`}>
+            {signatureCheck.valid === true ? '✍️ Signed' :
+             signatureCheck.valid === false ? '🔴 Bad Signature' : '⚪ No Signature'}
+          </div>
+        )}
+        {institutionName && (
+          <div className="public-security-item success">🏛️ {institutionName}</div>
+        )}
       </div>
 
       {/* Full certificate */}
-      <div className="public-cert-wrapper">
+      <div className="public-cert-wrapper" style={{ position: 'relative' }}>
         <CertificateRenderer data={details} qrUrl={qrUrl} />
+        {revocationInfo?.revoked && (
+          <div className="revoked-watermark-overlay">
+            <span>REVOKED</span>
+          </div>
+        )}
       </div>
     </div>
   );

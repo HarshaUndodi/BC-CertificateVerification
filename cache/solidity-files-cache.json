@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/home/harsha/BlockChain/CertifiacateVerification/contracts/CertificateManager.sol": {
-      "lastModificationDate": 1778614916455,
-      "contentHash": "2aa43e6860db63647a58110741870549",
+      "lastModificationDate": 1779519759129,
+      "contentHash": "0cb2a35b5e79678bac31204f779e8a5b",
       "sourceName": "contracts/CertificateManager.sol",
       "solcConfig": {
         "version": "0.8.24",
