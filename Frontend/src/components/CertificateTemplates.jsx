@@ -1,6 +1,41 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
+// ── Handwritten-style SVG Signatures ──────────────────────────
+const SignatureA = () => (
+  <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 32C12 18 18 10 28 12C38 14 30 28 24 30C18 32 20 22 26 18C32 14 42 10 48 14C54 18 50 28 44 30C40 31 46 20 56 16C62 13 68 16 72 20C76 24 74 30 68 32C64 33 70 18 80 14C86 12 92 16 96 20C100 24 104 18 108 14" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+    <path d="M95 20C98 22 102 20 106 18" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+  </svg>
+);
+
+const SignatureB = () => (
+  <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 28C16 14 24 8 32 12C36 14 34 22 28 26C24 28 30 16 38 12C44 9 50 14 52 20C54 26 48 30 44 28C40 26 52 12 62 10C68 9 72 14 74 20C76 26 72 30 68 28C66 27 78 10 88 12C94 13 98 18 100 24C102 28 106 24 110 20" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+  </svg>
+);
+
+const SignatureC = () => (
+  <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 30C10 22 16 14 22 12C28 10 32 16 30 22C28 28 22 30 20 26C18 22 24 14 34 12C40 11 44 16 46 22C48 28 44 32 40 30C38 29 48 14 58 12C64 11 68 16 70 22" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+    <path d="M70 22C72 26 76 28 80 26C84 24 82 18 78 16C74 14 84 12 92 14C98 16 102 22 100 26C98 30 94 28 96 24C98 20 104 18 110 20" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+  </svg>
+);
+
+const SignatureD = () => (
+  <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M8 26C14 14 22 8 30 10C34 11 36 18 32 24C28 30 22 28 24 22C26 16 34 12 44 14C50 15 54 20 52 26C50 30 46 28 48 22C50 16 58 12 66 14C72 16 76 22 74 28" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+    <path d="M74 28C72 32 76 30 80 24C84 18 90 14 96 16C100 18 102 24 98 28C96 30 100 22 106 18C110 16 114 18 114 22" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+  </svg>
+);
+
+const SignatureE = () => (
+  <svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 30C14 20 20 12 28 10C34 8 38 14 36 20C34 26 28 28 26 24C24 20 32 10 42 8C48 7 52 12 54 18C56 24 52 28 48 26" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+    <path d="M48 26C46 24 56 10 66 10C72 10 76 16 74 22C72 28 68 26 70 20C72 14 80 10 88 12C94 14 96 20 94 26C92 30 98 22 104 16C108 12 112 14 112 18" stroke="#1a1a1a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+  </svg>
+);
+
 // ─────────────────────────────────────────────────────────────
 // TEMPLATE 1 — GRADUATION DEGREE  (Gold / Parchment)
 // ─────────────────────────────────────────────────────────────
@@ -49,6 +84,7 @@ export function GraduationTemplate({ data, qrUrl }) {
       {/* Footer */}
       <div className="grad-footer">
         <div className="grad-sig">
+          <SignatureA />
           <div className="grad-sig-line" />
           <span className="grad-sig-label">REGISTRAR</span>
         </div>
@@ -65,6 +101,7 @@ export function GraduationTemplate({ data, qrUrl }) {
         </div>
 
         <div className="grad-sig grad-sig-right">
+          <SignatureB />
           <div className="grad-sig-line" />
           <span className="grad-sig-label">VICE CHANCELLOR</span>
         </div>
@@ -125,9 +162,21 @@ export function CourseCompletionTemplate({ data, qrUrl }) {
           </div>
         </div>
 
-        <div className="course-qr-bottom">
-          <QRCodeSVG value={qrUrl} size={55} fgColor="#1e3a8a" bgColor="transparent" />
-          <span className="course-qr-label">Scan to verify</span>
+        <div className="course-footer-row">
+          <div className="course-sig-block">
+            <SignatureC />
+            <div className="course-sig-line" />
+            <span className="course-sig-label">COURSE DIRECTOR</span>
+          </div>
+          <div className="course-qr-bottom">
+            <QRCodeSVG value={qrUrl} size={55} fgColor="#1e3a8a" bgColor="transparent" />
+            <span className="course-qr-label">Scan to verify</span>
+          </div>
+          <div className="course-sig-block">
+            <SignatureD />
+            <div className="course-sig-line" />
+            <span className="course-sig-label">HEAD OF DEPT.</span>
+          </div>
         </div>
       </div>
     </div>
@@ -203,7 +252,11 @@ export function SkillTemplate({ data, qrUrl }) {
 
       {/* Footer */}
       <div className="skill-footer">
-        <span className="skill-footer-label">CERTIFYING AUTHORITY</span>
+        <div className="skill-sig-block">
+          <SignatureE />
+          <div className="skill-sig-line" />
+          <span className="skill-footer-label">CERTIFYING AUTHORITY</span>
+        </div>
         <span className="skill-verified-badge">✅ Blockchain verified</span>
       </div>
     </div>
@@ -259,6 +312,7 @@ export function AchievementTemplate({ data, qrUrl }) {
       {/* Footer */}
       <div className="ach-footer">
         <div className="ach-sig">
+          <SignatureA />
           <div className="ach-sig-line" />
           <span className="ach-sig-label">DIRECTOR</span>
         </div>
@@ -266,6 +320,7 @@ export function AchievementTemplate({ data, qrUrl }) {
           ID: {data.id} · certisafe.app/verify/{data.id}
         </p>
         <div className="ach-sig">
+          <SignatureC />
           <div className="ach-sig-line" />
           <span className="ach-sig-label">DEAN</span>
         </div>
@@ -349,10 +404,12 @@ export function InternshipTemplate({ data, qrUrl }) {
       <div className="intern-footer">
         <div className="intern-sigs">
           <div className="intern-sig-item">
+            <SignatureB />
             <div className="intern-sig-line" />
             <span>HR MANAGER</span>
           </div>
           <div className="intern-sig-item">
+            <SignatureD />
             <div className="intern-sig-line" />
             <span>CTO</span>
           </div>

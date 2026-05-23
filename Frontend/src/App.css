@@ -1619,3 +1619,46 @@ button:disabled {
     max-width: 100%;
   }
 }
+
+/* ════════════════════════════════════════════════════════════
+   CERTIFICATE SIGNATURES
+════════════════════════════════════════════════════════════ */
+.course-footer-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 20px;
+  gap: 16px;
+}
+.course-sig-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 130px;
+}
+.course-sig-line {
+  width: 120px;
+  height: 1px;
+  background: #1e3a8a;
+  opacity: 0.3;
+  margin: 2px 0 4px;
+}
+.course-sig-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #1e3a8a;
+  text-transform: uppercase;
+}
+.skill-sig-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.skill-sig-line {
+  width: 120px;
+  height: 1px;
+  background: #0d9488;
+  opacity: 0.3;
+  margin: 2px 0 4px;
+}
