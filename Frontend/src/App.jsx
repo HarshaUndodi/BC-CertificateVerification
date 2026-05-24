@@ -6,6 +6,7 @@ import VerifyCertificate from './components/VerifyCertificate';
 import PublicVerify from './components/PublicVerify';
 import InstitutionManager from './components/InstitutionManager';
 import RevokeCertificate from './components/RevokeCertificate';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 import abi from './components/CertificateManager.json';
 import "./App.css";
 
@@ -70,6 +71,7 @@ function Dashboard() {
     issue: 'Issue Certificate',
     revoke: 'Revoke Certificate',
     institutions: 'Institution Registry',
+    analytics: 'Analytics Dashboard',
   };
 
   return (
@@ -105,6 +107,13 @@ function Dashboard() {
               <span>🏛️</span> Institutions
             </li>
           )}
+
+          {/* Analytics — Admin Only */}
+          {isAdmin && (
+            <li className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>
+              <span>📊</span> Analytics
+            </li>
+          )}
         </ul>
 
         <div className="sidebar-footer">
@@ -132,6 +141,7 @@ function Dashboard() {
           {activeTab === 'issue' && <GenerateCertificate />}
           {activeTab === 'revoke' && <RevokeCertificate />}
           {activeTab === 'institutions' && <InstitutionManager />}
+          {activeTab === 'analytics' && <AnalyticsDashboard />}
         </div>
       </main>
     </div>

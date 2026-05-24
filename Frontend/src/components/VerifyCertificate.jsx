@@ -9,6 +9,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import CertificateRenderer from './CertificateTemplates';
 import { computePhotoHash, isPhotoAuthentic } from '../utils/photoHash';
 import { extractImagesFromPdf } from '../utils/pdfImages';
+import { computeTrustScore } from '../utils/trustScore';
+import { parseUniversityCertificate } from '../utils/ocrParser';
 
 // Set PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -31,6 +33,14 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   // ── PDF Tamper Detection State ──
   const [pdfTamperDetected, setPdfTamperDetected] = useState(false);
   const [pdfExtractedPhoto, setPdfExtractedPhoto] = useState('');
+
+  // ── Trust Score State ──
+  const [trustScore, setTrustScore] = useState(null);
+
+  // ── Universal OCR State ──
+  const [ocrResult, setOcrResult] = useState(null);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrLoading, setOcrLoading] = useState(false);
 
   const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
   const ContractABI     = abi.abi;
@@ -272,6 +282,56 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
         setSignatureCheck({ valid: null, reason: 'No digital signature recorded' });
       }
 
+      // ── 3. Compute Trust Score ──
+      // We need to read the latest state values, but since setState is async,
+      // we compute directly from local variables.
+      const localPhotoCheck = photoCheck; // will be set by now via await
+      // Build trust score from the checks we just performed
+      // Note: we recalculate using the local vars since state may not be updated yet
+      let finalPhotoCheck = null;
+      let finalSigCheck = null;
+      
+      // Re-derive photo check result for trust score
+      if (onChainPhotoHash && onChainPhotoHash !== '0x' + '0'.repeat(64)) {
+        if (isPdfMode) {
+          let auth = false;
+          let bestDist = 64;
+          for (const imgSrc of pdfImages) {
+            try {
+              const h = await computePhotoHash(imgSrc);
+              const r = isPhotoAuthentic(onChainPhotoHash, h);
+              if (r.distance < bestDist) bestDist = r.distance;
+              if (r.authentic) { auth = true; break; }
+            } catch {}
+          }
+          finalPhotoCheck = { authentic: auth };
+        } else if (certData.photo) {
+          try {
+            const h = await computePhotoHash(certData.photo);
+            finalPhotoCheck = isPhotoAuthentic(onChainPhotoHash, h);
+          } catch { finalPhotoCheck = { authentic: null }; }
+        }
+      }
+      
+      if (adminSig && adminSig !== '0x') {
+        try {
+          const msg = JSON.stringify({ id: certId, ipfsHash: result.data, photoHash: onChainPhotoHash, issuer: result.issuer, recipient: certData.recipient, certType: certData.certType || certData.type });
+          const recovered = ethers.verifyMessage(msg, adminSig);
+          finalSigCheck = { valid: recovered.toLowerCase() === result.issuedBy.toLowerCase() };
+        } catch { finalSigCheck = { valid: false }; }
+      }
+
+      const score = computeTrustScore({
+        isValid: result.isValid,
+        photoCheck: finalPhotoCheck,
+        sigCheck: finalSigCheck,
+        revocation: { revoked, revokedAt },
+        institutionName: institutionName,
+        isPdfMode,
+        pdfImageCount: pdfImages.length,
+      });
+      setTrustScore(score);
+
       if (!result.isValid) {
         setPdfStatus('❌ Certificate NOT Found on Blockchain!');
         alert('Certificate NOT Found or Invalid! ❌');
@@ -296,6 +356,30 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
 
   const shareableURL = `${window.location.origin}/verify/${id || defaultId}`;
 
+  // ── Universal OCR Handler ──
+  const handleUniversalUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setOcrResult(null);
+    setOcrLoading(true);
+    setOcrProgress(0);
+    try {
+      const result = await parseUniversityCertificate(file, setOcrProgress);
+      setOcrResult(result);
+      // If a CertiSafe ID was found, auto-verify it
+      if (result.parsed.certificateId) {
+        setId(result.parsed.certificateId);
+        setVerifyMode('id');
+        handleVerifyWithId(result.parsed.certificateId);
+      }
+    } catch (err) {
+      console.error('OCR Error:', err);
+      setOcrResult({ rawText: '', parsed: {}, error: 'Failed to parse certificate' });
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
   return (
     <div className="section">
       {!autoVerify && <h2>Verify Certificate</h2>}
@@ -314,6 +398,12 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
               onClick={() => setVerifyMode('pdf')}
             >
               📄 Upload PDF
+            </button>
+            <button
+              className={`tab-btn ${verifyMode === 'universal' ? 'active' : ''}`}
+              onClick={() => setVerifyMode('universal')}
+            >
+              🌐 Universal Verify
             </button>
           </div>
 
@@ -339,6 +429,63 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
                 <input type="file" accept=".pdf" onChange={handlePdfUpload} hidden />
               </label>
               {pdfStatus && <p className="pdf-status">{pdfStatus}</p>}
+            </div>
+          )}
+
+          {verifyMode === 'universal' && (
+            <div className="pdf-upload-box">
+              <label className="upload-label">
+                <span className="upload-icon">🌐</span>
+                <span>Upload Any Certificate (PDF/Image)</span>
+                <input type="file" accept=".pdf,image/*" onChange={handleUniversalUpload} hidden />
+              </label>
+              <p className="pdf-status" style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                AI-powered OCR will extract text from any university certificate
+              </p>
+              {ocrLoading && (
+                <div className="ocr-progress-bar">
+                  <div className="ocr-progress-fill" style={{ width: `${ocrProgress}%` }} />
+                  <span className="ocr-progress-text">🔍 Scanning... {ocrProgress}%</span>
+                </div>
+              )}
+              {ocrResult && !ocrResult.error && (
+                <div className="ocr-result-card">
+                  <h3 className="ocr-result-title">📝 AI-Extracted Fields</h3>
+                  <div className="ocr-fields-grid">
+                    {ocrResult.parsed.candidateName && (
+                      <div className="ocr-field"><span className="ocr-field-label">Name</span><span className="ocr-field-value">{ocrResult.parsed.candidateName}</span></div>
+                    )}
+                    {ocrResult.parsed.institution && (
+                      <div className="ocr-field"><span className="ocr-field-label">Institution</span><span className="ocr-field-value">{ocrResult.parsed.institution}</span></div>
+                    )}
+                    {ocrResult.parsed.degree && (
+                      <div className="ocr-field"><span className="ocr-field-label">Degree</span><span className="ocr-field-value">{ocrResult.parsed.degree}</span></div>
+                    )}
+                    {ocrResult.parsed.course && (
+                      <div className="ocr-field"><span className="ocr-field-label">Course</span><span className="ocr-field-value">{ocrResult.parsed.course}</span></div>
+                    )}
+                    {ocrResult.parsed.date && (
+                      <div className="ocr-field"><span className="ocr-field-label">Date</span><span className="ocr-field-value">{ocrResult.parsed.date}</span></div>
+                    )}
+                    {ocrResult.parsed.grade && (
+                      <div className="ocr-field"><span className="ocr-field-label">Grade</span><span className="ocr-field-value">{ocrResult.parsed.grade}</span></div>
+                    )}
+                    {ocrResult.parsed.certificateId && (
+                      <div className="ocr-field"><span className="ocr-field-label">Cert ID</span><span className="ocr-field-value">{ocrResult.parsed.certificateId}</span></div>
+                    )}
+                    <div className="ocr-field"><span className="ocr-field-label">Type</span><span className="ocr-field-value">{ocrResult.parsed.type || 'Unknown'}</span></div>
+                  </div>
+                  {ocrResult.parsed.certificateId && (
+                    <p className="ocr-blockchain-match">✅ CertiSafe ID detected — auto-verifying on blockchain...</p>
+                  )}
+                  {!ocrResult.parsed.certificateId && (
+                    <p className="ocr-no-match">⚠️ No CertiSafe ID found. This certificate was not issued through our platform.</p>
+                  )}
+                </div>
+              )}
+              {ocrResult?.error && (
+                <p className="pdf-status">❌ {ocrResult.error}</p>
+              )}
             </div>
           )}
         </>
@@ -377,6 +524,37 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       ═══════════════════════════════════════════════ */}
       {verificationResult && verificationResult.isValid && (
         <>
+          {/* ── Trust Score Gauge ── */}
+          {trustScore && (
+            <div className="trust-score-section">
+              <div className="trust-score-gauge" style={{ '--score-color': trustScore.color }}>
+                <svg viewBox="0 0 120 120" className="trust-score-svg">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke={trustScore.color} strokeWidth="8"
+                    strokeDasharray={`${(trustScore.score / 100) * 327} 327`}
+                    strokeLinecap="round" transform="rotate(-90 60 60)" className="trust-score-ring" />
+                </svg>
+                <div className="trust-score-center">
+                  <span className="trust-score-number" style={{ color: trustScore.color }}>{trustScore.score}%</span>
+                  <span className="trust-score-grade">{trustScore.grade}</span>
+                </div>
+              </div>
+              <div className="trust-score-info">
+                <h3 className="trust-score-label" style={{ color: trustScore.color }}>{trustScore.label}</h3>
+                <p className="trust-score-subtitle">AI Trust Score</p>
+                <div className="trust-score-checks">
+                  {trustScore.checks.map((c, i) => (
+                    <div key={i} className={`trust-check-item ${c.status}`}>
+                      <span className="trust-check-icon">{c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : '⚪'}</span>
+                      <span className="trust-check-name">{c.name}</span>
+                      <span className="trust-check-pts">{c.score}/{[25,20,20,15,10,10][i]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── Revocation Banner ── */}
           {revocationInfo?.revoked && (
             <div className="revoked-overlay-banner">
