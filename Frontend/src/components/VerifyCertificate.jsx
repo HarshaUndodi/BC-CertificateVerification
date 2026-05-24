@@ -9,7 +9,6 @@ import * as pdfjsLib from 'pdfjs-dist';
 import CertificateRenderer from './CertificateTemplates';
 import { computePhotoHash, isPhotoAuthentic } from '../utils/photoHash';
 import { extractImagesFromPdf } from '../utils/pdfImages';
-import { computeTrustScore } from '../utils/trustScore';
 import { parseUniversityCertificate } from '../utils/ocrParser';
 
 // Set PDF.js worker
@@ -33,9 +32,6 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   // ── PDF Tamper Detection State ──
   const [pdfTamperDetected, setPdfTamperDetected] = useState(false);
   const [pdfExtractedPhoto, setPdfExtractedPhoto] = useState('');
-
-  // ── Trust Score State ──
-  const [trustScore, setTrustScore] = useState(null);
 
   // ── Universal OCR State ──
   const [ocrResult, setOcrResult] = useState(null);
@@ -321,17 +317,6 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
         } catch { finalSigCheck = { valid: false }; }
       }
 
-      const score = computeTrustScore({
-        isValid: result.isValid,
-        photoCheck: finalPhotoCheck,
-        sigCheck: finalSigCheck,
-        revocation: { revoked, revokedAt },
-        institutionName: institutionName,
-        isPdfMode,
-        pdfImageCount: pdfImages.length,
-      });
-      setTrustScore(score);
-
       if (!result.isValid) {
         setPdfStatus('❌ Certificate NOT Found on Blockchain!');
         alert('Certificate NOT Found or Invalid! ❌');
@@ -524,37 +509,6 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       ═══════════════════════════════════════════════ */}
       {verificationResult && verificationResult.isValid && (
         <>
-          {/* ── Trust Score Gauge ── */}
-          {trustScore && (
-            <div className="trust-score-section">
-              <div className="trust-score-gauge" style={{ '--score-color': trustScore.color }}>
-                <svg viewBox="0 0 120 120" className="trust-score-svg">
-                  <circle cx="60" cy="60" r="52" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                  <circle cx="60" cy="60" r="52" fill="none" stroke={trustScore.color} strokeWidth="8"
-                    strokeDasharray={`${(trustScore.score / 100) * 327} 327`}
-                    strokeLinecap="round" transform="rotate(-90 60 60)" className="trust-score-ring" />
-                </svg>
-                <div className="trust-score-center">
-                  <span className="trust-score-number" style={{ color: trustScore.color }}>{trustScore.score}%</span>
-                  <span className="trust-score-grade">{trustScore.grade}</span>
-                </div>
-              </div>
-              <div className="trust-score-info">
-                <h3 className="trust-score-label" style={{ color: trustScore.color }}>{trustScore.label}</h3>
-                <p className="trust-score-subtitle">AI Trust Score</p>
-                <div className="trust-score-checks">
-                  {trustScore.checks.map((c, i) => (
-                    <div key={i} className={`trust-check-item ${c.status}`}>
-                      <span className="trust-check-icon">{c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : '⚪'}</span>
-                      <span className="trust-check-name">{c.name}</span>
-                      <span className="trust-check-pts">{c.score}/{[25,20,20,15,10,10][i]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* ── Revocation Banner ── */}
           {revocationInfo?.revoked && (
             <div className="revoked-overlay-banner">
