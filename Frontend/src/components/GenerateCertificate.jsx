@@ -93,13 +93,24 @@ function GenerateCertificate() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!id || !issuer || !recipient || !course && certType !== 'achievement') {
+    if (!id || !issuer || !recipient || (!course && certType !== 'achievement')) {
       alert('Please fill all mandatory fields.');
       return;
     }
 
     setIsUploading(true);
-    setMintStatus('');
+    setMintStatus('⏳ Connecting wallet...');
+    
+    let signer;
+    try {
+      const blockchain = await getBlockchain(true);
+      signer = blockchain.signer;
+    } catch (err) {
+      alert("Please connect your MetaMask wallet first.");
+      setIsUploading(false);
+      return;
+    }
+
     try {
       const skillsArr = skills
         ? skills.split(',').map(s => s.trim()).filter(Boolean)
@@ -147,8 +158,7 @@ function GenerateCertificate() {
       const ipfsHash = await uploadToIPFS(metadata);
 
       // ── Step 3: Sign metadata (Admin Digital Signature) ──
-      setMintStatus('✍️ Step 3/4: Signing certificate metadata...');
-      const { signer } = await getBlockchain(true);
+      setMintStatus('✍️ Step 3/4: Signing certificate metadata (Please check MetaMask popup)...');
 
       // Create a deterministic message to sign (certId + ipfsHash + photoHash)
       const messageToSign = JSON.stringify({

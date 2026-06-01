@@ -59,7 +59,7 @@ export function GraduationTemplate({ data, qrUrl }) {
 
         <div className="grad-photo-box">
           {data.photo
-            ? <img src={data.photo} alt="Candidate" className="grad-photo-img" />
+            ? <img src={data.photo} alt="Candidate" className="grad-photo-img" crossOrigin="anonymous" />
             : <span className="photo-placeholder-icon">👤<br/><small>Photo</small></span>
           }
         </div>
@@ -126,7 +126,7 @@ export function CourseCompletionTemplate({ data, qrUrl }) {
         </div>
         <div className="course-sidebar-photo-wrap">
           {data.photo
-            ? <img src={data.photo} alt="Candidate" className="course-sidebar-photo" />
+            ? <img src={data.photo} alt="Candidate" className="course-sidebar-photo" crossOrigin="anonymous" />
             : <span className="photo-placeholder-icon small">👤<br/><small>Photo</small></span>
           }
         </div>
@@ -208,7 +208,7 @@ export function SkillTemplate({ data, qrUrl }) {
         <div className="skill-left">
           <div className="skill-photo-wrap">
             {data.photo
-              ? <img src={data.photo} alt="Candidate" className="skill-photo-img" />
+              ? <img src={data.photo} alt="Candidate" className="skill-photo-img" crossOrigin="anonymous" />
               : <span className="photo-placeholder-icon">👤<br/><small>Photo</small></span>
             }
           </div>
@@ -281,7 +281,7 @@ export function AchievementTemplate({ data, qrUrl }) {
         <p className="ach-institution">{data.issuer}</p>
         <div className="ach-photo-wrap">
           {data.photo
-            ? <img src={data.photo} alt="Candidate" className="ach-photo-img" />
+            ? <img src={data.photo} alt="Candidate" className="ach-photo-img" crossOrigin="anonymous" />
             : <span className="photo-placeholder-icon">👤<br/><small>Photo</small></span>
           }
         </div>
@@ -359,7 +359,7 @@ export function InternshipTemplate({ data, qrUrl }) {
         <div className="intern-left">
           <div className="intern-photo-wrap">
             {data.photo
-              ? <img src={data.photo} alt="Candidate" className="intern-photo-img" />
+              ? <img src={data.photo} alt="Candidate" className="intern-photo-img" crossOrigin="anonymous" />
               : <span className="photo-placeholder-icon">👤<br/><small>Photo</small></span>
             }
           </div>
