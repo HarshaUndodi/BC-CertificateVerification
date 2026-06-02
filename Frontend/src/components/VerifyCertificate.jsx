@@ -105,24 +105,13 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       // 3. Wait for every image in the clone to fully load
       await Promise.all(Array.from(images).map(waitForImgLoad));
 
-      // 4. Strip CSS background-image from all elements in the clone.
-      //    html2canvas has a bug with createPattern on background images
-      //    that can result in 0-dimension canvas errors.
+      // 4. Strip CSS background-image from all elements in the clone completely.
+      //    html2canvas has bugs with createPattern on gradients and images, especially on subsequent runs.
       const allElements = clone.querySelectorAll('*');
       allElements.forEach((el) => {
-        const computed = window.getComputedStyle(el);
-        if (computed.backgroundImage && computed.backgroundImage !== 'none') {
-          // Keep gradient backgrounds but remove url() image references
-          const bg = computed.backgroundImage;
-          const cleaned = bg.replace(/url\([^)]*\),?\s*/g, '').trim();
-          el.style.backgroundImage = cleaned || 'none';
-        }
+        el.style.backgroundImage = 'none'; // Completely disable background images/gradients
       });
-      // Also handle the clone root itself
-      const rootBg = window.getComputedStyle(clone).backgroundImage;
-      if (rootBg && rootBg !== 'none') {
-        clone.style.backgroundImage = rootBg.replace(/url\([^)]*\),?\s*/g, '').trim() || 'none';
-      }
+      clone.style.backgroundImage = 'none';
 
       const canvas = await html2canvas(clone, {
         scale: 2,
@@ -139,6 +128,21 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
         format:      [canvas.width, canvas.height],
       });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      
+      // 5. EMBED ORIGINAL PHOTO FOR ANTI-FRAUD VERIFICATION
+      // We embed the original photo out-of-bounds (-100, -100) so it's not visible,
+      // but it exists in the PDF structure for the anti-fraud extractor to find.
+      if (verificationResult && verificationResult.photo) {
+        try {
+          const originalPhotoData = await toDataUrl(verificationResult.photo);
+          if (originalPhotoData && originalPhotoData.startsWith('data:')) {
+            // Embed at 0,0 with 1x1 pixel size (invisible but extracts cleanly)
+            pdf.addImage(originalPhotoData, 'PNG', 0, 0, 1, 1);
+          }
+        } catch (e) {
+          console.warn('Could not embed original photo in PDF', e);
+        }
+      }
       pdf.setFontSize(8);
       pdf.setTextColor(200, 200, 200);
       pdf.text(
