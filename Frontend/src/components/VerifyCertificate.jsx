@@ -60,8 +60,8 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
         img.crossOrigin = 'anonymous';
         img.onload = () => {
           const c = document.createElement('canvas');
-          c.width = img.naturalWidth;
-          c.height = img.naturalHeight;
+          c.width = img.naturalWidth || 1;
+          c.height = img.naturalHeight || 1;
           c.getContext('2d').drawImage(img, 0, 0);
           try { resolve(c.toDataURL('image/png')); }
           catch { resolve(url); }
@@ -72,23 +72,39 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
     }
   };
 
+  // ── Helper: wait for an <img> element to finish loading ────
+  const waitForImgLoad = (imgEl) =>
+    new Promise((resolve) => {
+      if (imgEl.complete && imgEl.naturalWidth > 0) { resolve(); return; }
+      imgEl.onload = () => resolve();
+      imgEl.onerror = () => resolve();
+    });
+
   // ── Download as PDF ──────────────────────────────────────────
   const downloadPDF = async () => {
     if (!certRef.current) return;
     setDownloading(true);
     try {
-      // Pre-convert all cross-origin images to inline base64 to avoid
-      // CORS "tainted canvas" errors in html2canvas.
-      const images = certRef.current.querySelectorAll('img');
-      const originals = [];
+      // 1. Clone the certificate so we don't touch the live DOM
+      const clone = certRef.current.cloneNode(true);
+      clone.style.position = 'absolute';
+      clone.style.left = '-9999px';
+      clone.style.top = '0';
+      document.body.appendChild(clone);
+
+      // 2. Convert all cross-origin images to inline base64 in the clone
+      const images = clone.querySelectorAll('img');
       for (const img of images) {
-        originals.push({ el: img, src: img.src });
         if (img.src && !img.src.startsWith('data:')) {
-          img.src = await toDataUrl(img.src);
+          const dataUrl = await toDataUrl(img.src);
+          img.src = dataUrl;
         }
       }
 
-      const canvas = await html2canvas(certRef.current, {
+      // 3. Wait for every image in the clone to fully load
+      await Promise.all(Array.from(images).map(waitForImgLoad));
+
+      const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
         allowTaint: false,
@@ -96,8 +112,8 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
         backgroundColor: '#ffffff',
       });
 
-      // Restore original image sources
-      originals.forEach(({ el, src }) => { el.src = src; });
+      // 4. Remove the clone
+      document.body.removeChild(clone);
 
       const imgData = canvas.toDataURL('image/png');
       const pdf     = new jsPDF({
