@@ -41,17 +41,64 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
   const ContractABI     = abi.abi;
 
+  // ── Helper: convert an image URL to a base64 data URL ──────
+  const toDataUrl = async (url) => {
+    // Method 1: fetch as blob (most reliable for CORS)
+    try {
+      const resp = await fetch(url, { mode: 'cors' });
+      const blob = await resp.blob();
+      return await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(url);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      // Method 2: Image element fallback
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          c.getContext('2d').drawImage(img, 0, 0);
+          try { resolve(c.toDataURL('image/png')); }
+          catch { resolve(url); }
+        };
+        img.onerror = () => resolve(url);
+        img.src = url;
+      });
+    }
+  };
+
   // ── Download as PDF ──────────────────────────────────────────
   const downloadPDF = async () => {
     if (!certRef.current) return;
     setDownloading(true);
     try {
+      // Pre-convert all cross-origin images to inline base64 to avoid
+      // CORS "tainted canvas" errors in html2canvas.
+      const images = certRef.current.querySelectorAll('img');
+      const originals = [];
+      for (const img of images) {
+        originals.push({ el: img, src: img.src });
+        if (img.src && !img.src.startsWith('data:')) {
+          img.src = await toDataUrl(img.src);
+        }
+      }
+
       const canvas = await html2canvas(certRef.current, {
         scale: 2,
         useCORS: true,
+        allowTaint: false,
         logging: false,
         backgroundColor: '#ffffff',
       });
+
+      // Restore original image sources
+      originals.forEach(({ el, src }) => { el.src = src; });
+
       const imgData = canvas.toDataURL('image/png');
       const pdf     = new jsPDF({
         orientation: 'landscape',
