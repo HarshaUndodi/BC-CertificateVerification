@@ -84,9 +84,10 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
   const downloadPDF = async () => {
     if (!certRef.current) return;
     setDownloading(true);
+    let clone = null;
     try {
       // 1. Clone the certificate so we don't touch the live DOM
-      const clone = certRef.current.cloneNode(true);
+      clone = certRef.current.cloneNode(true);
       clone.style.position = 'absolute';
       clone.style.left = '-9999px';
       clone.style.top = '0';
@@ -107,13 +108,10 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
-        allowTaint: false,
+        allowTaint: true,
         logging: false,
         backgroundColor: '#ffffff',
       });
-
-      // 4. Remove the clone
-      document.body.removeChild(clone);
 
       const imgData = canvas.toDataURL('image/png');
       const pdf     = new jsPDF({
@@ -135,6 +133,10 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       console.error('PDF Export Error:', err);
       alert('Failed to generate PDF. Check console.');
     } finally {
+      // Always clean up the clone
+      if (clone && clone.parentNode) {
+        clone.parentNode.removeChild(clone);
+      }
       setDownloading(false);
     }
   };
