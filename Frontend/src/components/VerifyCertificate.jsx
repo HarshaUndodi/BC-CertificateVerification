@@ -105,6 +105,25 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       // 3. Wait for every image in the clone to fully load
       await Promise.all(Array.from(images).map(waitForImgLoad));
 
+      // 4. Strip CSS background-image from all elements in the clone.
+      //    html2canvas has a bug with createPattern on background images
+      //    that can result in 0-dimension canvas errors.
+      const allElements = clone.querySelectorAll('*');
+      allElements.forEach((el) => {
+        const computed = window.getComputedStyle(el);
+        if (computed.backgroundImage && computed.backgroundImage !== 'none') {
+          // Keep gradient backgrounds but remove url() image references
+          const bg = computed.backgroundImage;
+          const cleaned = bg.replace(/url\([^)]*\),?\s*/g, '').trim();
+          el.style.backgroundImage = cleaned || 'none';
+        }
+      });
+      // Also handle the clone root itself
+      const rootBg = window.getComputedStyle(clone).backgroundImage;
+      if (rootBg && rootBg !== 'none') {
+        clone.style.backgroundImage = rootBg.replace(/url\([^)]*\),?\s*/g, '').trim() || 'none';
+      }
+
       const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
