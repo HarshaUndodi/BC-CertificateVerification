@@ -105,6 +105,10 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       // 3. Wait for every image in the clone to fully load
       await Promise.all(Array.from(images).map(waitForImgLoad));
 
+      // Hide the photo element in the clone so it is NOT baked into the background canvas.
+      const clonePhotoEl = clone.querySelector('img[crossOrigin="anonymous"]');
+      if (clonePhotoEl) clonePhotoEl.style.opacity = '0';
+
       // 4. Strip CSS background-image from all elements in the clone completely.
       //    html2canvas has bugs with createPattern on gradients and images, especially on subsequent runs.
       const allElements = clone.querySelectorAll('*');
@@ -312,18 +316,19 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
           let bestDistance = 64;
           let bestImage = '';
           
-          for (const imgSrc of pdfImages) {
+          // Defeat "add on top" attack by ONLY checking the topmost candidate image.
+          // The background canvas is typically pdfImages[0]. Subsequent images are drawn on top.
+          // If a fraudster places a new photo on top, it will be the last image in the array.
+          const candidateImages = pdfImages.length > 1 ? pdfImages.slice(1) : pdfImages;
+          const topmostImage = candidateImages[candidateImages.length - 1];
+
+          if (topmostImage) {
             try {
-              const computedHash = await computePhotoHash(imgSrc);
+              const computedHash = await computePhotoHash(topmostImage);
               const photoResult = isPhotoAuthentic(onChainPhotoHash, computedHash);
-              if (photoResult.distance < bestDistance) {
-                bestDistance = photoResult.distance;
-                bestImage = imgSrc;
-              }
-              if (photoResult.authentic) {
-                authentic = true;
-                break;
-              }
+              bestDistance = photoResult.distance;
+              bestImage = topmostImage;
+              if (photoResult.authentic) authentic = true;
             } catch (e) {
               console.warn('Hash error for extracted image', e);
             }
@@ -397,13 +402,13 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       if (onChainPhotoHash && onChainPhotoHash !== '0x' + '0'.repeat(64)) {
         if (isPdfMode) {
           let auth = false;
-          let bestDist = 64;
-          for (const imgSrc of pdfImages) {
+          const candidateImages = pdfImages.length > 1 ? pdfImages.slice(1) : pdfImages;
+          const topmostImage = candidateImages[candidateImages.length - 1];
+          if (topmostImage) {
             try {
-              const h = await computePhotoHash(imgSrc);
+              const h = await computePhotoHash(topmostImage);
               const r = isPhotoAuthentic(onChainPhotoHash, h);
-              if (r.distance < bestDist) bestDist = r.distance;
-              if (r.authentic) { auth = true; break; }
+              if (r.authentic) auth = true;
             } catch {}
           }
           finalPhotoCheck = { authentic: auth };
