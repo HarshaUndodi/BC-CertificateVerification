@@ -130,19 +130,37 @@ function VerifyCertificate({ defaultId = '', autoVerify = false }) {
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       
       // 5. EMBED ORIGINAL PHOTO FOR ANTI-FRAUD VERIFICATION
-      // We embed the original photo out-of-bounds (-100, -100) so it's not visible,
-      // but it exists in the PDF structure for the anti-fraud extractor to find.
+      // Instead of a hidden 1x1 image, we find the exact coordinates of the photo
+      // in the cloned DOM and overlay the pure original photo on top of the canvas.
+      // This ensures if a fraudster visually replaces the photo in the PDF, they 
+      // destroy this image object, and tamper detection will catch it!
       if (verificationResult && verificationResult.photo) {
         try {
           const originalPhotoData = await toDataUrl(verificationResult.photo);
           if (originalPhotoData && originalPhotoData.startsWith('data:')) {
-            // Embed at 0,0 with 1x1 pixel size (invisible but extracts cleanly)
-            pdf.addImage(originalPhotoData, 'PNG', 0, 0, 1, 1);
+            const photoEl = clone.querySelector('img[crossOrigin="anonymous"]');
+            if (photoEl) {
+              const containerRect = clone.getBoundingClientRect();
+              const elRect = photoEl.getBoundingClientRect();
+              
+              // html2canvas scale is 2
+              const scale = 2;
+              const photoX = (elRect.left - containerRect.left) * scale;
+              const photoY = (elRect.top - containerRect.top) * scale;
+              const photoW = elRect.width * scale;
+              const photoH = elRect.height * scale;
+
+              pdf.addImage(originalPhotoData, 'PNG', photoX, photoY, photoW, photoH);
+            } else {
+              // Fallback: embed invisibly if photo element not found (e.g., no placeholder)
+              pdf.addImage(originalPhotoData, 'PNG', 0, 0, 1, 1);
+            }
           }
         } catch (e) {
           console.warn('Could not embed original photo in PDF', e);
         }
       }
+
       pdf.setFontSize(8);
       pdf.setTextColor(200, 200, 200);
       pdf.text(
